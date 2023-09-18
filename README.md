@@ -1,1 +1,1 @@
-# KP-golang-tgs6
+# KartuPrakerja-Golang-Tugas6

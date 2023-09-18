@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -13,7 +14,7 @@ var (
 	DB *gorm.DB
 )
 
-func init()  {
+func init() {
 	InitDB()
 	InitialMigration()
 }
@@ -21,18 +22,18 @@ func init()  {
 type Config struct {
 	DB_Username string
 	DB_Password string
-	DB_Port string
-	DB_Host string
-	DB_Name string
+	DB_Port     string
+	DB_Host     string
+	DB_Name     string
 }
 
-func InitDB()  {
-	config := Config {
+func InitDB() {
+	config := Config{
 		DB_Username: "root",
 		DB_Password: "",
-		DB_Port: "3306",
-		DB_Host: "localhost",
-		DB_Name: "crud_go",
+		DB_Port:     "3306",
+		DB_Host:     "localhost",
+		DB_Name:     "crud_go",
 	}
 
 	connectionString := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&Local",
@@ -52,12 +53,12 @@ func InitDB()  {
 
 type User struct {
 	gorm.Model
-	Name string `json:"name" from:"name"`
-	Email string `json:"email" from:"email"`
-	Password string `json:"password" from:"password"`
+	Name     string `json:"name" form:"name"`
+	Email    string `json:"email" form:"email"`
+	Password string `json:"password" form:"password"`
 }
 
-func InitialMigration()  {
+func InitialMigration() {
 	DB.AutoMigrate(&User{})
 }
 
@@ -70,47 +71,92 @@ func GetUsersController(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"code": 200,
-		"msg": "Success get all users",
+		"msg":  "Success get all users",
 		"Data": users,
 	})
 }
 
 // get User by Id
 func GetUserController(c echo.Context) error {
-	
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid ID")
+	}
+
+	user := User{}
+	if err := DB.First(&user, id).Error; err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "User not found")
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"code": 200,
+		"msg":  "Success get user",
+		"Data": user,
+	})
 }
 
 // create new User
-func CreateuserController(c echo.Context) error {
+func CreateUserController(c echo.Context) error {
 	user := User{}
 	c.Bind(&user)
 
-	if err := DB.Save(&user).Error; err != nil {
+	if err := DB.Create(&user).Error; err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"code": 201,
-		"msg": "Success create new user",
+		"msg":  "Success create new user",
 		"Data": user,
 	})
 }
 
 // Delete User by Id
 func DeleteUserController(c echo.Context) error {
-	
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid ID")
+	}
+
+	if err := DB.Where("id = ?", id).Delete(&User{}).Error; err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to delete user")
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"code": 200,
+		"msg":  "Success delete user",
+	})
 }
 
 // Update User by Id
 func UpdateUserController(c echo.Context) error {
-	
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid ID")
+	}
+
+	user := User{}
+	if err := DB.First(&user, id).Error; err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "User not found")
+	}
+
+	c.Bind(&user)
+	if err := DB.Save(&user).Error; err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"code": 200,
+		"msg":  "Success update user",
+		"Data": user,
+	})
 }
 
-func main()  {
+func main() {
 	e := echo.New()
 
 	e.GET("/users", GetUsersController)
 	e.GET("/users/:id", GetUserController)
-	e.POST("/users", CreateuserController)
+	e.POST("/users", CreateUserController)
 	e.DELETE("/users/:id", DeleteUserController)
 	e.PUT("/users/:id", UpdateUserController)
 
